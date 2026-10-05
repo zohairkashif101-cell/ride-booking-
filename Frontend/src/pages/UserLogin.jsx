@@ -23,7 +23,7 @@ const UserLogin = () => {
     try {
       const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000'
       const response = await axios.post(
-        `${baseUrl}/users/login`,
+        `${baseUrl}/api/auth/login`,
         userData
       )
 

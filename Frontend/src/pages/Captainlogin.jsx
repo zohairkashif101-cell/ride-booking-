@@ -23,19 +23,22 @@ const Captainlogin = () => {
     try {
       const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000'
       const response = await axios.post(
-        `${baseUrl}/captains/login`,
+        `${baseUrl}/api/auth/login`,
         captainData
       )
 
       if (response.status === 200) {
         const data = response.data
-        setCaptain(data.captain)
-        localStorage.setItem('token', data.token)
+        if (setCaptain) setCaptain(data.user)
+        if (data.token) localStorage.setItem('token', data.token)
         navigate('/captain-home')
       }
     } catch (err) {
       console.error('Captain login error:', err)
-      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Invalid email or password'
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.[0]?.msg ||
+        'Invalid email or password'
       setErrorMessage(msg)
     }
 
@@ -46,7 +49,6 @@ const Captainlogin = () => {
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center items-center sm:py-6">
       <div className="h-screen sm:h-211 w-full max-w-md bg-white flex flex-col justify-between p-7 shadow-2xl sm:rounded-3xl overflow-y-auto">
-        {/* Top Section */}
         <div>
           <img
             className="w-16 mb-10"
@@ -89,7 +91,7 @@ const Captainlogin = () => {
               type="submit"
               className="bg-[#111111] text-white font-semibold mb-3 rounded-lg px-4 py-3 w-full text-lg hover:bg-neutral-800 active:scale-[0.99] transition cursor-pointer"
             >
-              Login
+              Login as Captain
             </button>
           </form>
 
@@ -104,7 +106,6 @@ const Captainlogin = () => {
           </p>
         </div>
 
-        {/* Bottom Switch Button */}
         <div className="pt-6">
           <Link
             to="/login"

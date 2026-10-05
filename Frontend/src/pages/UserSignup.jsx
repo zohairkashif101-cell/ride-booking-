@@ -17,11 +17,11 @@ const UserSignup = () => {
     e.preventDefault()
     setErrorMessage('')
 
+    // Backend expects 'name' as a single string
+    const fullNameString = `${firstName} ${lastName}`.trim()
+
     const newUser = {
-      fullname: {
-        firstname: firstName,
-        lastname: lastName
-      },
+      name: fullNameString,
       email: email,
       password: password
     }
@@ -29,19 +29,24 @@ const UserSignup = () => {
     try {
       const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000'
       const response = await axios.post(
-        `${baseUrl}/users/register`,
+        `${baseUrl}/api/auth/register`,
         newUser
       )
 
-      if (response.status === 201) {
+      if (response.status === 201 || response.status === 200) {
         const data = response.data
         setUser(data.user)
-        localStorage.setItem('token', data.token)
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+        }
         navigate('/home')
       }
     } catch (err) {
       console.error('Registration error:', err)
-      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Registration failed'
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.[0]?.msg ||
+        'Registration failed'
       setErrorMessage(msg)
     }
 

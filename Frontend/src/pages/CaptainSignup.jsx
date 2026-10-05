@@ -22,13 +22,13 @@ const CaptainSignup = () => {
     e.preventDefault()
     setErrorMessage('')
 
+    const fullNameString = `${firstName} ${lastName}`.trim()
+
     const captainData = {
-      fullname: {
-        firstname: firstName,
-        lastname: lastName
-      },
+      name: fullNameString,
       email: email,
       password: password,
+      role: 'driver', // Backend schema se match karne ke liye
       vehicle: {
         color: vehicleColor,
         plate: vehiclePlate,
@@ -40,19 +40,24 @@ const CaptainSignup = () => {
     try {
       const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000'
       const response = await axios.post(
-        `${baseUrl}/captains/register`,
+        `${baseUrl}/api/auth/register`,
         captainData
       )
 
-      if (response.status === 201) {
+      if (response.status === 201 || response.status === 200) {
         const data = response.data
-        setCaptain(data.captain)
-        localStorage.setItem('token', data.token)
+        setCaptain(data.user)
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+        }
         navigate('/captain-home')
       }
     } catch (err) {
       console.error('Captain signup error:', err)
-      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Captain registration failed'
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.[0]?.msg ||
+        'Captain registration failed'
       setErrorMessage(msg)
     }
 
@@ -69,7 +74,6 @@ const CaptainSignup = () => {
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center items-center sm:py-6">
       <div className="h-screen sm:h-auto sm:min-h-211 w-full max-w-md bg-white flex flex-col justify-between p-7 shadow-2xl sm:rounded-3xl overflow-y-auto">
-        {/* Top Section */}
         <div>
           <div className="mb-5">
             <img
@@ -77,19 +81,6 @@ const CaptainSignup = () => {
               src="https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.png"
               alt="Uber"
             />
-            <svg
-              className="w-6 h-6 text-gray-900"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-              />
-            </svg>
           </div>
 
           {errorMessage && (
@@ -99,7 +90,6 @@ const CaptainSignup = () => {
           )}
 
           <form onSubmit={submitHandler}>
-            {/* Captain Name */}
             <h3 className="text-base font-medium mb-2 text-gray-900">
               What's our Captain's name
             </h3>
@@ -121,7 +111,6 @@ const CaptainSignup = () => {
               />
             </div>
 
-            {/* Captain Email */}
             <h3 className="text-base font-medium mb-2 text-gray-900">
               What's our Captain's email
             </h3>
@@ -134,12 +123,12 @@ const CaptainSignup = () => {
               placeholder="email@example.com"
             />
 
-            {/* Password */}
             <h3 className="text-base font-medium mb-2 text-gray-900">
-              Enter Password
+              Enter Password (min 6 chars)
             </h3>
             <input
               required
+              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-[#eeeeee] mb-4 rounded-lg px-4 py-2.5 border border-transparent focus:border-gray-400 w-full text-sm sm:text-base placeholder:text-gray-400 outline-none transition"
@@ -147,7 +136,6 @@ const CaptainSignup = () => {
               placeholder="password"
             />
 
-            {/* Vehicle Information */}
             <h3 className="text-base font-medium mb-2 text-gray-900">
               Vehicle Information
             </h3>
@@ -192,11 +180,9 @@ const CaptainSignup = () => {
                 <option value="car">Car</option>
                 <option value="auto">Auto</option>
                 <option value="moto">Moto</option>
-                <option value="motorcycle">Motorcycle</option>
               </select>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               className="bg-[#111111] text-white font-semibold mb-3 rounded-lg px-4 py-3 w-full text-base sm:text-lg hover:bg-neutral-800 active:scale-[0.99] transition cursor-pointer"
@@ -206,28 +192,13 @@ const CaptainSignup = () => {
           </form>
 
           <p className="text-center font-normal text-gray-800 text-sm sm:text-base mt-2">
-            Already have a account?{' '}
+            Already have an account?{' '}
             <Link
               to="/captain-login"
               className="text-blue-600 font-medium hover:underline"
             >
               Login here
             </Link>
-          </p>
-        </div>
-
-        {/* Bottom Legal Notice */}
-        <div className="pt-6 pb-2">
-          <p className="text-[10px] sm:text-[11px] leading-tight text-gray-500">
-            This site is protected by reCAPTCHA and the{' '}
-            <span className="underline cursor-pointer text-gray-700">
-              Google Privacy Policy
-            </span>{' '}
-            and{' '}
-            <span className="underline cursor-pointer text-gray-700">
-              Terms of Service apply
-            </span>
-            .
           </p>
         </div>
       </div>
