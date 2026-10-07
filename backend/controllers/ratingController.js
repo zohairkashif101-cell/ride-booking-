@@ -29,13 +29,14 @@ const addRating = async (req, res) => {
       });
     }
 
+    const userId = req.user?._id?.toString() || req.user?.userId?.toString();
+
     // Check if user is part of this ride
     const isPassenger =
-      ride.passenger.toString() === req.user.userId;
+      ride.passenger && ride.passenger.toString() === userId;
 
     const isDriver =
-      ride.driver &&
-      ride.driver.toString() === req.user.userId;
+      ride.driver && ride.driver.toString() === userId;
 
     if (!isPassenger && !isDriver) {
       return res.status(403).json({
@@ -51,7 +52,7 @@ const addRating = async (req, res) => {
     }
 
     // User cannot rate themselves
-    if (toUserId === req.user.userId) {
+    if (toUserId.toString() === userId) {
       return res.status(400).json({
         message: "You cannot rate yourself",
       });
@@ -59,22 +60,21 @@ const addRating = async (req, res) => {
 
     // Check if target user is actually part of the ride
     const isTargetPassenger =
-      ride.passenger.toString() === toUserId;
+      ride.passenger && ride.passenger.toString() === toUserId.toString();
 
     const isTargetDriver =
-      ride.driver &&
-      ride.driver.toString() === toUserId;
+      ride.driver && ride.driver.toString() === toUserId.toString();
 
     if (!isTargetPassenger && !isTargetDriver) {
       return res.status(400).json({
-        message: "User is not part of this ride",
+        message: "Target user is not part of this ride",
       });
     }
 
     // Check if rating already exists
     const existingRating = await Rating.findOne({
       ride: rideId,
-      fromUser: req.user.userId,
+      fromUser: userId,
     });
 
     if (existingRating) {
@@ -86,7 +86,7 @@ const addRating = async (req, res) => {
     // Create rating
     const newRating = await Rating.create({
       ride: rideId,
-      fromUser: req.user.userId,
+      fromUser: userId,
       toUser: toUserId,
       rating,
       comment,
@@ -113,8 +113,8 @@ const getUserRatings = async (req, res) => {
     const ratings = await Rating.find({
       toUser: userId,
     })
-      .populate("fromUser", "name email")
-      .populate("toUser", "name email")
+      .populate("fromUser", "fullname email")
+      .populate("toUser", "fullname email")
       .populate("ride");
 
     res.status(200).json({

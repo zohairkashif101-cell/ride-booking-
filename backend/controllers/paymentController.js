@@ -22,8 +22,10 @@ const processPayment = async (req, res) => {
       });
     }
 
+    const userId = req.user?._id?.toString() || req.user?.userId?.toString();
+
     // Check if logged-in user is the passenger
-    if (ride.passenger.toString() !== req.user.userId) {
+    if (ride.passenger.toString() !== userId) {
       return res.status(403).json({
         message: "You are not the passenger of this ride",
       });
@@ -51,16 +53,17 @@ const processPayment = async (req, res) => {
     if (existingPayment) {
       return res.status(400).json({
         message: "Payment already exists for this ride",
+        payment: existingPayment,
       });
     }
 
     // Create payment
     const payment = await Payment.create({
       ride: rideId,
-      passenger: req.user.userId,
-      amount,
+      passenger: userId,
+      amount: Number(amount),
       method,
-      status: method === "cash" ? "paid" : "pending",
+      status: "paid",
     });
 
     res.status(201).json({
@@ -79,13 +82,14 @@ const processPayment = async (req, res) => {
 const getPaymentByRide = async (req, res) => {
   try {
     const { rideId } = req.params;
+    const userId = req.user?._id?.toString() || req.user?.userId?.toString();
 
     // Find payment
     const payment = await Payment.findOne({
       ride: rideId,
     })
       .populate("ride")
-      .populate("passenger", "name email role");
+      .populate("passenger", "fullname email");
 
     if (!payment) {
       return res.status(404).json({
@@ -94,7 +98,7 @@ const getPaymentByRide = async (req, res) => {
     }
 
     // Only passenger of the payment can view it
-    if (payment.passenger._id.toString() !== req.user.userId) {
+    if (payment.passenger._id.toString() !== userId) {
       return res.status(403).json({
         message: "You are not authorized to view this payment",
       });

@@ -179,7 +179,6 @@ const MapView = ({
 
         <MapViewController
           center={userCoords}
-          destination={destinationCoords}
           routeCoords={activeRoute}
           followUser={followUser}
         />

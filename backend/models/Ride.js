@@ -10,9 +10,16 @@ const rideSchema = new mongoose.Schema(
 
     driver: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Captain",
       default: null,
     },
+
+    rejectedCaptains: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Captain",
+      },
+    ],
 
     pickup: {
       address: {
