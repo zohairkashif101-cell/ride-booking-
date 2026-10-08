@@ -66,8 +66,10 @@ const captainSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 captainSchema.methods.generateAuthToken = function () {
-    const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET || 'ride_booking_jwt_secret_key_2026_super_secure', { expiresIn: '24h' });
-    return token;
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is missing in environment variables');
+    }
+    return jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
 captainSchema.methods.comparePassword = async function (password) {

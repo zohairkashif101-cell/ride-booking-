@@ -1,5 +1,4 @@
 const express = require("express");
-
 const router = express.Router();
 
 const {
@@ -16,35 +15,22 @@ const {
     authCaptain
 } = require("../middleware/authMiddleware");
 
-
 // =========================
 // USER ROUTES
 // =========================
-
 router.post("/book", protect, createRide);
-
-// Get current user's ride history
 router.get("/my/history", protect, getMyRides);
-
 
 // =========================
 // CAPTAIN ROUTES
 // =========================
-
 router.get("/requests", authCaptain, getRequestedRides);
-
-router.put("/captain/:id/status", authCaptain, updateRideStatus);
-
 router.put("/captain/:id/reject", authCaptain, rejectRide);
 
-
-// =========================
-// USER RIDE ROUTES
-// =========================
-
-router.get("/:id", protect, getRideById);
-
+// Combined route for ride status updates (Accept/Start/Complete/Cancel)
 router.put("/:id/status", protect, updateRideStatus);
 
+// Single Ride details (Ownership protected in controller)
+router.get("/:id", protect, getRideById);
 
-module.exports = router;
+module.exports = router;

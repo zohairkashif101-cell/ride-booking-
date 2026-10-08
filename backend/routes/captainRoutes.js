@@ -51,15 +51,17 @@ router.post('/login', [
 ], captainController.loginCaptain);
 
 router.get('/profile', authMiddleware.authCaptain, captainController.getCaptainProfile);
-router.get('/logout', authMiddleware.authCaptain, captainController.logoutCaptain);
+
+// Changed GET to POST for Logout Security
+router.post('/logout', authMiddleware.authCaptain, captainController.logoutCaptain);
 
 // Toggle captain online/offline status
 router.put('/status', authMiddleware.authCaptain, captainController.updateCaptainStatus);
 
-// Get captain's ride history (rides where this captain was the driver)
+// Get captain's ride history
 router.get('/rides/history', authMiddleware.authCaptain, captainController.getCaptainRideHistory);
 
-// Get captain's earnings summary calculated from completed rides
+// Get captain earnings
 router.get('/earnings', authMiddleware.authCaptain, captainController.getCaptainEarnings);
 
 module.exports = router;

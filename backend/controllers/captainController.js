@@ -4,7 +4,14 @@ const { validationResult } = require('express-validator');
 const BlacklistToken = require('../models/BlacklistToken');
 const Ride = require('../models/Ride');
 
-module.exports.registerCaptain = async (req, res, next) => {
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000
+};
+
+module.exports.registerCaptain = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -12,7 +19,6 @@ module.exports.registerCaptain = async (req, res, next) => {
         }
 
         const { fullname, email, password, vehicle } = req.body;
-
         const firstname = fullname?.firstname || req.body.firstName || req.body.firstname;
         const lastname = fullname?.lastname || req.body.lastName || req.body.lastname || '';
 
@@ -22,45 +28,30 @@ module.exports.registerCaptain = async (req, res, next) => {
         const vehicleType = vehicle?.vehicleType || req.body.vehicleType;
 
         const isCaptainExist = await captainModel.findOne({ email });
-
         if (isCaptainExist) {
             return res.status(400).json({ message: 'Captain already exists with this email' });
         }
 
         const hashedPassword = await captainModel.hashPassword(password);
-
         const captain = await captainService.createCaptain({
-            firstname,
-            lastname,
-            email,
-            password: hashedPassword,
-            color,
-            plate,
-            capacity: Number(capacity),
-            vehicleType
+            firstname, lastname, email, password: hashedPassword, color, plate, capacity: Number(capacity), vehicleType
         });
 
         const token = captain.generateAuthToken();
-
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 24 * 60 * 60 * 1000
-        });
+        res.cookie('token', token, cookieOptions);
 
         captain.password = undefined;
-
         return res.status(201).json({ token, captain });
     } catch (err) {
         console.error('Captain register error:', err);
         if (err.code === 11000) {
             return res.status(400).json({ message: 'Captain already exists with this email' });
         }
-        return res.status(500).json({ message: err.message || 'Server error during captain registration' });
+        return res.status(500).json({ message: 'Server error during captain registration' });
     }
 };
 
-module.exports.loginCaptain = async (req, res, next) => {
+module.exports.loginCaptain = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -68,84 +59,59 @@ module.exports.loginCaptain = async (req, res, next) => {
         }
 
         const { email, password } = req.body;
-
         const captain = await captainModel.findOne({ email }).select('+password');
 
-        if (!captain) {
-            return res.status(401).json({ message: 'Invalid email or password' });
-        }
-
-        const isMatch = await captain.comparePassword(password);
-
-        if (!isMatch) {
+        if (!captain || !(await captain.comparePassword(password))) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
 
         const token = captain.generateAuthToken();
-
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 24 * 60 * 60 * 1000
-        });
+        res.cookie('token', token, cookieOptions);
 
         captain.password = undefined;
-
         return res.status(200).json({ token, captain });
     } catch (err) {
         console.error('Captain login error:', err);
-        return res.status(500).json({ message: err.message || 'Server error during captain login' });
+        return res.status(500).json({ message: 'Server error during captain login' });
     }
 };
 
-module.exports.getCaptainProfile = async (req, res, next) => {
+module.exports.getCaptainProfile = async (req, res) => {
     return res.status(200).json(req.captain);
 };
 
-module.exports.logoutCaptain = async (req, res, next) => {
+module.exports.logoutCaptain = async (req, res) => {
     try {
-        res.clearCookie('token');
-        const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.startsWith('Bearer') ? req.headers.authorization.split(' ')[1] : null);
+        res.clearCookie('token', cookieOptions);
+        const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
 
         if (token) {
-            await BlacklistToken.findOneAndUpdate(
-                { token },
-                { token },
-                { upsert: true, new: true }
-            );
+            await BlacklistToken.findOneAndUpdate({ token }, { token }, { upsert: true, new: true });
         }
 
         return res.status(200).json({ message: 'Logged out successfully' });
     } catch (err) {
         console.error('Captain logout error:', err);
-        return res.status(500).json({ message: err.message || 'Server error during logout' });
+        return res.status(500).json({ message: 'Server error during logout' });
     }
 };
 
-// Toggle captain online/offline status
-module.exports.updateCaptainStatus = async (req, res, next) => {
+module.exports.updateCaptainStatus = async (req, res) => {
     try {
         const { status } = req.body;
-
         if (!['active', 'inactive'].includes(status)) {
             return res.status(400).json({ message: 'Status must be active or inactive' });
         }
 
-        const captain = await captainModel.findByIdAndUpdate(
-            req.captain._id,
-            { status },
-            { new: true }
-        );
-
+        const captain = await captainModel.findByIdAndUpdate(req.captain._id, { status }, { new: true });
         return res.status(200).json({ message: 'Status updated', captain });
     } catch (err) {
         console.error('Captain status update error:', err);
-        return res.status(500).json({ message: err.message || 'Server error' });
+        return res.status(500).json({ message: 'Server error' });
     }
 };
 
-// Get captain's ride history
-module.exports.getCaptainRideHistory = async (req, res, next) => {
+module.exports.getCaptainRideHistory = async (req, res) => {
     try {
         const rides = await Ride.find({ driver: req.captain._id })
             .populate('passenger', 'fullname email')
@@ -154,23 +120,18 @@ module.exports.getCaptainRideHistory = async (req, res, next) => {
         return res.status(200).json({ rides });
     } catch (err) {
         console.error('Captain ride history error:', err);
-        return res.status(500).json({ message: err.message || 'Server error' });
+        return res.status(500).json({ message: 'Server error' });
     }
 };
 
-// Get captain earnings metrics calculated from real completed rides in DB
-module.exports.getCaptainEarnings = async (req, res, next) => {
+module.exports.getCaptainEarnings = async (req, res) => {
     try {
-        const completedRides = await Ride.find({
-            driver: req.captain._id,
-            status: 'completed'
-        })
-        .populate('passenger', 'fullname email')
-        .sort({ createdAt: -1 });
+        const completedRides = await Ride.find({ driver: req.captain._id, status: 'completed' })
+            .populate('passenger', 'fullname email')
+            .sort({ createdAt: -1 });
 
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
@@ -184,12 +145,8 @@ module.exports.getCaptainEarnings = async (req, res, next) => {
             totalEarnings += fare;
 
             const rideDate = new Date(ride.createdAt);
-            if (rideDate >= startOfDay) {
-                todayEarnings += fare;
-            }
-            if (rideDate >= startOfWeek) {
-                weeklyEarnings += fare;
-            }
+            if (rideDate >= startOfDay) todayEarnings += fare;
+            if (rideDate >= startOfWeek) weeklyEarnings += fare;
         });
 
         return res.status(200).json({
@@ -201,6 +158,6 @@ module.exports.getCaptainEarnings = async (req, res, next) => {
         });
     } catch (err) {
         console.error('Captain earnings error:', err);
-        return res.status(500).json({ message: err.message || 'Server error' });
+        return res.status(500).json({ message: 'Server error' });
     }
 };

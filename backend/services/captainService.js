@@ -6,17 +6,25 @@ module.exports.createCaptain = async ({
     if (!firstname || !email || !password || !color || !plate || !capacity || !vehicleType) {
         throw new Error('All fields are required');
     }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const parsedCapacity = Number(capacity);
+
+    if (isNaN(parsedCapacity) || parsedCapacity < 1) {
+        throw new Error('Valid vehicle capacity is required');
+    }
+
     const captain = await captainModel.create({
         fullname: {
-            firstname,
-            lastname
+            firstname: firstname.trim(),
+            lastname: lastname ? lastname.trim() : ''
         },
-        email,
+        email: normalizedEmail,
         password,
         vehicle: {
-            color,
-            plate,
-            capacity,
+            color: color.trim(),
+            plate: plate.trim(),
+            capacity: parsedCapacity,
             vehicleType
         }
     });

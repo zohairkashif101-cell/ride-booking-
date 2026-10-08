@@ -6,58 +6,34 @@ const processPayment = async (req, res) => {
   try {
     const { rideId, amount, method } = req.body;
 
-    // Check required fields
     if (!rideId || !amount || !method) {
-      return res.status(400).json({
-        message: "Ride ID, amount and payment method are required",
-      });
+      return res.status(400).json({ message: "Ride ID, amount and payment method are required" });
     }
 
-    // Check if ride exists
     const ride = await Ride.findById(rideId);
-
     if (!ride) {
-      return res.status(404).json({
-        message: "Ride not found",
-      });
+      return res.status(404).json({ message: "Ride not found" });
     }
 
     const userId = req.user?._id?.toString() || req.user?.userId?.toString();
 
-    // Check if logged-in user is the passenger
     if (ride.passenger.toString() !== userId) {
-      return res.status(403).json({
-        message: "You are not the passenger of this ride",
-      });
+      return res.status(403).json({ message: "You are not the passenger of this ride" });
     }
 
-    // Payment only after ride is completed
     if (ride.status !== "completed") {
-      return res.status(400).json({
-        message: "Payment can only be processed after ride completion",
-      });
+      return res.status(400).json({ message: "Payment can only be processed after ride completion" });
     }
 
-    // Check payment method
     if (!["cash", "card"].includes(method)) {
-      return res.status(400).json({
-        message: "Invalid payment method",
-      });
+      return res.status(400).json({ message: "Invalid payment method" });
     }
 
-    // Check if payment already exists
-    const existingPayment = await Payment.findOne({
-      ride: rideId,
-    });
-
+    const existingPayment = await Payment.findOne({ ride: rideId });
     if (existingPayment) {
-      return res.status(400).json({
-        message: "Payment already exists for this ride",
-        payment: existingPayment,
-      });
+      return res.status(400).json({ message: "Payment already exists for this ride", payment: existingPayment });
     }
 
-    // Create payment
     const payment = await Payment.create({
       ride: rideId,
       passenger: userId,
@@ -66,15 +42,10 @@ const processPayment = async (req, res) => {
       status: "paid",
     });
 
-    res.status(201).json({
-      message: "Payment processed successfully",
-      payment,
-    });
+    res.status(201).json({ message: "Payment processed successfully", payment });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to process payment",
-      error: error.message,
-    });
+    console.error("Process Payment Error:", error);
+    res.status(500).json({ message: "Failed to process payment" });
   }
 };
 
@@ -84,38 +55,23 @@ const getPaymentByRide = async (req, res) => {
     const { rideId } = req.params;
     const userId = req.user?._id?.toString() || req.user?.userId?.toString();
 
-    // Find payment
-    const payment = await Payment.findOne({
-      ride: rideId,
-    })
+    const payment = await Payment.findOne({ ride: rideId })
       .populate("ride")
       .populate("passenger", "fullname email");
 
     if (!payment) {
-      return res.status(404).json({
-        message: "Payment not found for this ride",
-      });
+      return res.status(404).json({ message: "Payment not found for this ride" });
     }
 
-    // Only passenger of the payment can view it
     if (payment.passenger._id.toString() !== userId) {
-      return res.status(403).json({
-        message: "You are not authorized to view this payment",
-      });
+      return res.status(403).json({ message: "You are not authorized to view this payment" });
     }
 
-    res.status(200).json({
-      payment,
-    });
+    res.status(200).json({ payment });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to get payment",
-      error: error.message,
-    });
+    console.error("Get Payment Error:", error);
+    res.status(500).json({ message: "Failed to get payment" });
   }
 };
 
-module.exports = {
-  processPayment,
-  getPaymentByRide,
-};
+module.exports = { processPayment, getPaymentByRide };

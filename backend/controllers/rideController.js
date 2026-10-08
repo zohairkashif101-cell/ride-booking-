@@ -6,21 +6,15 @@ const createRide = async (req, res) => {
     const { pickup, destination, fare } = req.body;
 
     if (!pickup || !destination) {
-      return res.status(400).json({
-        message: "Pickup and destination are required",
-      });
+      return res.status(400).json({ message: "Pickup and destination are required" });
     }
 
     if (!pickup.address || pickup.latitude === undefined || pickup.longitude === undefined) {
-      return res.status(400).json({
-        message: "Pickup must include address, latitude, and longitude",
-      });
+      return res.status(400).json({ message: "Pickup must include address, latitude, and longitude" });
     }
 
     if (!destination.address || destination.latitude === undefined || destination.longitude === undefined) {
-      return res.status(400).json({
-        message: "Destination must include address, latitude, and longitude",
-      });
+      return res.status(400).json({ message: "Destination must include address, latitude, and longitude" });
     }
 
     const userId = req.user?._id || req.user?.userId;
@@ -32,18 +26,12 @@ const createRide = async (req, res) => {
       fare: fare || 0,
     });
 
-    res.status(201).json({
-      message: "Ride booked successfully",
-      ride,
-    });
+    res.status(201).json({ message: "Ride booked successfully", ride });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to book ride",
-      error: error.message,
-    });
+    console.error("Create Ride Error:", error);
+    res.status(500).json({ message: "Failed to book ride" });
   }
 };
-
 
 // Get All Requested Rides (for captain)
 const getRequestedRides = async (req, res) => {
@@ -59,17 +47,12 @@ const getRequestedRides = async (req, res) => {
       .populate("passenger", "fullname email")
       .sort({ createdAt: -1 });
 
-    res.status(200).json({
-      rides,
-    });
+    res.status(200).json({ rides });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to get ride requests",
-      error: error.message,
-    });
+    console.error("Get Requested Rides Error:", error);
+    res.status(500).json({ message: "Failed to get ride requests" });
   }
 };
-
 
 // Get Current User's Rides (history)
 const getMyRides = async (req, res) => {
@@ -81,19 +64,14 @@ const getMyRides = async (req, res) => {
       .populate("driver", "fullname email vehicle")
       .sort({ createdAt: -1 });
 
-    res.status(200).json({
-      rides,
-    });
+    res.status(200).json({ rides });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to get ride history",
-      error: error.message,
-    });
+    console.error("Get My Rides Error:", error);
+    res.status(500).json({ message: "Failed to get ride history" });
   }
 };
 
-
-// Get Single Ride
+// Get Single Ride (Added Ownership Check)
 const getRideById = async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id)
@@ -101,22 +79,23 @@ const getRideById = async (req, res) => {
       .populate("driver", "fullname email vehicle");
 
     if (!ride) {
-      return res.status(404).json({
-        message: "Ride not found",
-      });
+      return res.status(404).json({ message: "Ride not found" });
     }
 
-    res.status(200).json({
-      ride,
-    });
+    const currentUserId = (req.captain?._id || req.user?._id || req.user?.userId)?.toString();
+    const isPassenger = ride.passenger && ride.passenger._id.toString() === currentUserId;
+    const isDriver = ride.driver && ride.driver._id.toString() === currentUserId;
+
+    if (!isPassenger && !isDriver) {
+      return res.status(403).json({ message: "Unauthorized to access this ride details" });
+    }
+
+    res.status(200).json({ ride });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to get ride",
-      error: error.message,
-    });
+    console.error("Get Ride By Id Error:", error);
+    res.status(500).json({ message: "Failed to get ride" });
   }
 };
-
 
 // Reject Ride (Driver declines request)
 const rejectRide = async (req, res) => {
@@ -124,9 +103,7 @@ const rejectRide = async (req, res) => {
     const captainId = req.captain?._id || req.user?.userId;
 
     if (!captainId) {
-      return res.status(401).json({
-        message: "Unauthorized: Driver identity required",
-      });
+      return res.status(401).json({ message: "Unauthorized: Driver identity required" });
     }
 
     const ride = await Ride.findByIdAndUpdate(
@@ -136,52 +113,30 @@ const rejectRide = async (req, res) => {
     );
 
     if (!ride) {
-      return res.status(404).json({
-        message: "Ride not found",
-      });
+      return res.status(404).json({ message: "Ride not found" });
     }
 
-    res.status(200).json({
-      message: "Ride request rejected",
-      rideId: req.params.id,
-    });
+    res.status(200).json({ message: "Ride request rejected", rideId: req.params.id });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to reject ride",
-      error: error.message,
-    });
+    console.error("Reject Ride Error:", error);
+    res.status(500).json({ message: "Failed to reject ride" });
   }
 };
-
 
 // Update Ride Status
 const updateRideStatus = async (req, res) => {
   try {
     const { status } = req.body;
-
-    const allowedStatuses = [
-      "accepted",
-      "started",
-      "completed",
-      "cancelled",
-    ];
+    const allowedStatuses = ["accepted", "started", "completed", "cancelled"];
 
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({
-        message: "Invalid ride status",
-      });
+      return res.status(400).json({ message: "Invalid ride status" });
     }
 
-    const actingUserId = req.user?.userId || req.user?._id?.toString();
+    const actingUserId = req.user?.userId || req.user?._id?.toString() || req.captain?._id?.toString();
 
-    // 1. Accept ride — Atomic operation to prevent duplicate assignment / race conditions
+    // 1. Accept ride
     if (status === "accepted") {
-      if (req.user?.role !== "driver") {
-        return res.status(403).json({
-          message: "Only a driver can accept a ride",
-        });
-      }
-
       const assignedRide = await Ride.findOneAndUpdate(
         { _id: req.params.id, status: "requested" },
         { status: "accepted", driver: actingUserId },
@@ -196,65 +151,38 @@ const updateRideStatus = async (req, res) => {
         });
       }
 
-      return res.status(200).json({
-        message: "Ride accepted successfully",
-        ride: assignedRide,
-      });
+      return res.status(200).json({ message: "Ride accepted successfully", ride: assignedRide });
     }
 
     const ride = await Ride.findById(req.params.id);
-
     if (!ride) {
-      return res.status(404).json({
-        message: "Ride not found",
-      });
+      return res.status(404).json({ message: "Ride not found" });
     }
 
     // 2. Start ride
     if (status === "started") {
       if (ride.status !== "accepted") {
-        return res.status(400).json({
-          message: "Ride cannot be started unless accepted",
-        });
+        return res.status(400).json({ message: "Ride cannot be started unless accepted" });
       }
-
-      if (
-        !ride.driver ||
-        ride.driver.toString() !== actingUserId
-      ) {
-        return res.status(403).json({
-          message: "Only the assigned driver can start the ride",
-        });
+      if (!ride.driver || ride.driver.toString() !== actingUserId) {
+        return res.status(403).json({ message: "Only the assigned driver can start the ride" });
       }
     }
 
     // 3. Complete ride
     if (status === "completed") {
       if (ride.status !== "started") {
-        return res.status(400).json({
-          message: "Ride cannot be completed unless started",
-        });
+        return res.status(400).json({ message: "Ride cannot be completed unless started" });
       }
-
-      if (
-        !ride.driver ||
-        ride.driver.toString() !== actingUserId
-      ) {
-        return res.status(403).json({
-          message: "Only the assigned driver can complete the ride",
-        });
+      if (!ride.driver || ride.driver.toString() !== actingUserId) {
+        return res.status(403).json({ message: "Only the assigned driver can complete the ride" });
       }
     }
 
     // 4. Cancel ride
     if (status === "cancelled") {
-      if (
-        ride.status === "completed" ||
-        ride.status === "cancelled"
-      ) {
-        return res.status(400).json({
-          message: "Ride cannot be cancelled once completed or already cancelled",
-        });
+      if (ride.status === "completed" || ride.status === "cancelled") {
+        return res.status(400).json({ message: "Ride cannot be cancelled once completed or already cancelled" });
       }
 
       const passengerIdStr = ride.passenger?.toString();
@@ -265,9 +193,7 @@ const updateRideStatus = async (req, res) => {
       } else if (driverIdStr && driverIdStr === actingUserId) {
         ride.cancelledBy = "driver";
       } else {
-        return res.status(403).json({
-          message: "You are not authorized to cancel this ride",
-        });
+        return res.status(403).json({ message: "You are not authorized to cancel this ride" });
       }
     }
 
@@ -278,18 +204,12 @@ const updateRideStatus = async (req, res) => {
       .populate("passenger", "fullname email")
       .populate("driver", "fullname email vehicle");
 
-    return res.status(200).json({
-      message: "Ride status updated successfully",
-      ride: populatedRide,
-    });
+    return res.status(200).json({ message: "Ride status updated successfully", ride: populatedRide });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to update ride status",
-      error: error.message,
-    });
+    console.error("Update Ride Status Error:", error);
+    res.status(500).json({ message: "Failed to update ride status" });
   }
 };
-
 
 module.exports = {
   createRide,
@@ -298,4 +218,4 @@ module.exports = {
   getRideById,
   rejectRide,
   updateRideStatus,
-};
+};

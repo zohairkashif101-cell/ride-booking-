@@ -1,37 +1,47 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { UserDataContext } from '../context/UserContext';
 import BrandLogo from '../components/common/BrandLogo';
 
 const UserLogout = () => {
   const token = localStorage.getItem('userToken');
   const navigate = useNavigate();
+  const { setUser } = useContext(UserDataContext);
 
   useEffect(() => {
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-
-    const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000';
-
-    axios
-      .get(`${baseUrl}/users/logout`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      .then(() => {
-        localStorage.removeItem('userToken');
+    const handleLogout = async () => {
+      if (!token) {
+        setUser(null);
         navigate('/login');
-      })
-      .catch((err) => {
+        return;
+      }
+
+      const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:5000';
+
+      try {
+        // Updated from axios.get to axios.post
+        await axios.post(
+          `${baseUrl}/users/logout`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      } catch (err) {
         console.error('User logout error:', err);
+      } finally {
         localStorage.removeItem('userToken');
+        setUser(null);
         navigate('/login');
-      });
-  }, [token, navigate]);
+      }
+    };
+
+    handleLogout();
+  }, [token, navigate, setUser]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-950 text-white p-4">
